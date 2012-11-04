@@ -39,18 +39,26 @@ class Buffer(object):
     def offset_at(self, pos):
         return self.ulong_at(pos)
 
+    def offsets_at(self, pos, count):
+        offsets = []
+        i = 0
+        while i < count:
+            offsets.append(self.offset_at(pos + i * 4))
+            i += 1
+        return offsets
+
 
 class MMD0(object):
     def __init__(self, buffer):
         self.buffer = buffer
         self.id = buffer.ulong_at(0)
         self.modlen = buffer.ulong_at(4)
-        self.MMD0song_offset = buffer.offset_at(8)
+        self.song_offset = buffer.offset_at(8)
         # offset to table of offsets
-        self.MMD0Block_offset = buffer.offset_at(16)
+        self.blockarr_offset = buffer.offset_at(16)
         # offset to table of offsets
-        self.InstrHdr_offset = buffer.offset_at(24)
-        self.MMD0exp_offset = buffer.offset_at(32)
+        self.smplarr_offset = buffer.offset_at(24)
+        self.expdata_offset = buffer.offset_at(32)
         self.pstate = buffer.uword_at(40)
         self.pblock = buffer.uword_at(42)
         self.pline = buffer.uword_at(44)
@@ -60,17 +68,23 @@ class MMD0(object):
         self.extra_songs = buffer.ubyte_at(51)
 
         # load the MMD0song structure
-        self.MMD0song = MMD0song(buffer, self.MMD0song_offset)
-        # XXX load the block offset table, now that we know numblocks
+        self.song = MMD0song(buffer, self.song_offset)
+
+        # load the block offset table, now that we know numblocks
+        self.blockarr = buffer.offsets_at(self.blockarr_offset,
+                                          self.song.numblocks)
 
     def dump(self):
-        for attr in ('id', 'modlen', 'MMD0song_offset', 'MMD0Block_offset',
-                     'InstrHdr_offset', 'MMD0exp_offset',
+        print "MMD0 Header"
+        print "-----------"
+        for attr in ('id', 'modlen', 'song_offset', 'blockarr_offset',
+                     'smplarr_offset', 'expdata_offset',
                      'pstate', 'pblock', 'pline', 'pseqnum',
-                     'actplayline', 'counter', 'extra_songs'):
+                     'actplayline', 'counter', 'extra_songs',
+                     'blockarr'):
             print "%s: %r" % (attr, getattr(self, attr))
-        print "---"
-        self.MMD0song.dump()
+        print
+        self.song.dump()
 
 
 class MMD0song(object):
@@ -81,7 +95,7 @@ class MMD0song(object):
         self.sample = []
         i = 0
         while i < 63:
-            #self.sample.append(MMD0sample(buffer, sample_offset)
+            self.sample.append(MMD0sample(buffer, sample_offset))
             sample_offset += 8
             i += 1
 
@@ -98,11 +112,35 @@ class MMD0song(object):
         self.numsamples = buffer.ubyte_at(offset + 787)
 
     def dump(self):
-        # XXX dump sample structures
+        print "MMD0song"
+        print "--------"
         for attr in ('numblocks', 'songlen', 'playseq', 'deftempo',
                      'playtransp', 'flags', 'flags2', 'tempo2',
                      'trkvol', 'mastervol', 'numsamples'):
             print "%s: %r" % (attr, getattr(self, attr))
+        i = 0
+        while i < self.numsamples:
+            self.sample[i].dump(i)
+            i += 1
+        print
+
+
+class MMD0sample(object):
+    def __init__(self, buffer, offset):
+        self.buffer = buffer
+        self.rep = buffer.uword_at(offset)
+        self.replen = buffer.uword_at(offset + 2)
+        self.midich = buffer.ubyte_at(offset + 4)
+        self.midipreset = buffer.ubyte_at(offset + 5)
+        self.svol = buffer.ubyte_at(offset + 6)
+        self.strans = buffer.byte_at(offset + 7)
+
+    def dump(self, num):
+        print "Sample %d:" % num
+        for attr in ('rep', 'replen',
+                     #'midich', 'midipreset',
+                     'svol', 'strans'):
+            print "  %s: %r" % (attr, getattr(self, attr))
 
 
 if __name__ == '__main__':
