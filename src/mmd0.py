@@ -82,6 +82,10 @@ class MMD0(object):
         self.smplarr_offsets = buffer.offsets_at(self.smplarr_offset,
                                          self.song.numsamples)
 
+        self.smplarr = []
+        for smpl_offset in self.smplarr_offsets:
+            self.smplarr.append(InstrHdr(buffer, smpl_offset))
+
     def dump(self):
         print "MMD0 Header"
         print "-----------"
@@ -99,6 +103,14 @@ class MMD0(object):
         i = 0
         while i < self.song.numblocks:
             self.blockarr[i].dump(i)
+            i += 1
+        print
+
+        print "Instruments"
+        print "-----------"
+        i = 0
+        while i < self.song.numsamples:
+            self.smplarr[i].dump(i)
             i += 1
         print
 
@@ -162,6 +174,20 @@ class MMD0sample(object):
             print "  %s: %r" % (attr, getattr(self, attr))
 
 
+# deceptive name -- contains instrument sample data too
+class InstrHdr(object):
+    def __init__(self, buffer, offset):
+        self.buffer = buffer
+        self.length = buffer.ulong_at(offset)
+        self.type = buffer.word_at(offset + 4)
+        self.data = buffer.ubytes_at(offset + 6, self.length)
+
+    def dump(self, num):
+        print "InstrHdr %d:" % num
+        for attr in ('length', 'type', 'data'):
+            print "  %s: %r" % (attr, getattr(self, attr))
+
+
 class MMD0Block(object):
     def __init__(self, buffer, offset):
         self.buffer = buffer
@@ -204,6 +230,19 @@ class MMD0Block(object):
             line_no += 1
 
 
+STEP_NAMES = ('C-', 'C#', 'D-', 'D#', 'E-', 'F-',
+              'F#', 'G-', 'G#', 'A-', 'A#', 'B-')
+NOTE_NAMES = ['----']
+i = 0
+while i < 128:
+    octave = (i / 12) + 1
+    step = i % 12
+    octstr = str(octave).rjust(2)
+    NOTE_NAMES.append('%s%s' % (STEP_NAMES[step], octstr))
+    i += 1
+NOTE_NAMES = NOTE_NAMES[:128]
+
+
 class Event(object):
     def __init__(self, byte0, byte1, byte2):
         self.note = byte0 & 63
@@ -219,7 +258,8 @@ class Event(object):
         self.databyte = byte2
     
     def __str__(self):
-        return "[%s/%s/%s/%s]" % (self.instr, self.note, self.command, self.databyte)
+        return "[%02d/%s/%02d/%02d]" % (self.instr, NOTE_NAMES[self.note],
+                                        self.command, self.databyte)
 
 
 if __name__ == '__main__':
