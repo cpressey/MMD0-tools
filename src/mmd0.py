@@ -71,8 +71,16 @@ class MMD0(object):
         self.song = MMD0song(buffer, self.song_offset)
 
         # load the block offset table, now that we know numblocks
-        self.blockarr = buffer.offsets_at(self.blockarr_offset,
+        self.blockarr_offsets = buffer.offsets_at(self.blockarr_offset,
                                           self.song.numblocks)
+
+        self.blockarr = []
+        for block_offset in self.blockarr_offsets:
+            self.blockarr.append(MMD0Block(buffer, block_offset))
+
+        # ditto samples
+        self.smplarr_offsets = buffer.offsets_at(self.smplarr_offset,
+                                         self.song.numsamples)
 
     def dump(self):
         print "MMD0 Header"
@@ -81,10 +89,18 @@ class MMD0(object):
                      'smplarr_offset', 'expdata_offset',
                      'pstate', 'pblock', 'pline', 'pseqnum',
                      'actplayline', 'counter', 'extra_songs',
-                     'blockarr'):
+                     'blockarr_offsets', 'smplarr_offsets'):
             print "%s: %r" % (attr, getattr(self, attr))
         print
         self.song.dump()
+        
+        print "Blocks"
+        print "------"
+        i = 0
+        while i < self.song.numblocks:
+            self.blockarr[i].dump(i)
+            i += 1
+        print
 
 
 class MMD0song(object):
@@ -128,8 +144,11 @@ class MMD0song(object):
 class MMD0sample(object):
     def __init__(self, buffer, offset):
         self.buffer = buffer
-        self.rep = buffer.uword_at(offset)
-        self.replen = buffer.uword_at(offset + 2)
+        # rep and replen are shifted right one bit
+        self.raw_rep = buffer.uword_at(offset)
+        self.rep = self.raw_rep * 2
+        self.raw_replen = buffer.uword_at(offset + 2)
+        self.replen = self.raw_replen * 2
         self.midich = buffer.ubyte_at(offset + 4)
         self.midipreset = buffer.ubyte_at(offset + 5)
         self.svol = buffer.ubyte_at(offset + 6)
@@ -141,6 +160,48 @@ class MMD0sample(object):
                      #'midich', 'midipreset',
                      'svol', 'strans'):
             print "  %s: %r" % (attr, getattr(self, attr))
+
+
+class MMD0Block(object):
+    def __init__(self, buffer, offset):
+        self.buffer = buffer
+        self.numtracks = buffer.ubyte_at(offset)
+        # lines is zero based, so # of lines == self.lines + 1
+        self.raw_lines = buffer.ubyte_at(offset + 1)
+        self.lines = self.raw_lines + 1
+
+        self.track = []
+        i = 0
+        while i < self.numtracks:
+            self.track.append([])
+            i += 1
+
+        offset = offset + 2
+        line_no = 0
+        while line_no < self.lines:
+            track_no = 0
+            while track_no < self.numtracks:
+                event = buffer.ubytes_at(offset, 3)
+                self.track[track_no].append(event)
+                offset += 3
+                track_no += 1
+            line_no += 1
+
+    def dump(self, num):
+        print "Block %d:" % num
+        for attr in ('numtracks', 'lines'):
+            print "  %s: %r" % (attr, getattr(self, attr))
+        print "  Lines:"
+        line_no = 0
+        while line_no < self.lines:
+            track_no = 0
+            print "    ",
+            while track_no < self.numtracks:
+                s = repr(self.track[track_no][line_no])
+                print s.ljust(18),
+                track_no += 1
+            print
+            line_no += 1
 
 
 if __name__ == '__main__':
