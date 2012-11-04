@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+import sys
+
+
 class Buffer(object):
     def __init__(self, file):
         self.contents = file.read()
@@ -263,9 +266,14 @@ class Event(object):
 
 
 if __name__ == '__main__':
-    import sys
     b = None
     with open(sys.argv[1], 'r') as f:
         b = Buffer(f)
     m = MMD0(b)
     m.dump()
+    if False:
+        for byte in m.smplarr[0].data:
+            # upsample to 16-bit for aplay's benefit
+            # usage: mmd0.py your.med | aplay --rate=8287 --format=S16_BE
+            sys.stdout.write(chr(byte))
+            sys.stdout.write(chr(0))
