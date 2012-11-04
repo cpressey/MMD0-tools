@@ -182,7 +182,7 @@ class MMD0Block(object):
             track_no = 0
             while track_no < self.numtracks:
                 event = buffer.ubytes_at(offset, 3)
-                self.track[track_no].append(event)
+                self.track[track_no].append(Event(event[0], event[1], event[2]))
                 offset += 3
                 track_no += 1
             line_no += 1
@@ -197,11 +197,29 @@ class MMD0Block(object):
             track_no = 0
             print "    ",
             while track_no < self.numtracks:
-                s = repr(self.track[track_no][line_no])
+                s = str(self.track[track_no][line_no])
                 print s.ljust(18),
                 track_no += 1
             print
             line_no += 1
+
+
+class Event(object):
+    def __init__(self, byte0, byte1, byte2):
+        self.note = byte0 & 63
+        x = byte0 & 128
+        y = byte0 & 64
+        i = (byte1 & (128 + 64 + 32 + 16)) >> 4
+        if x:
+            i += 32
+        if y:
+            i += 64
+        self.instr = i
+        self.command = byte1 & 15
+        self.databyte = byte2
+    
+    def __str__(self):
+        return "[%s/%s/%s/%s]" % (self.instr, self.note, self.command, self.databyte)
 
 
 if __name__ == '__main__':
