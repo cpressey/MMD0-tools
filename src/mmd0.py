@@ -91,7 +91,9 @@ class MMD0(object):
 
     def flatten(self):
         """Turn the event data in the blocks in the song sequence
-        into a list of lists of events, one list of events per track.
+        into one big block.
+
+        TODO: handle MISC/0 commands ("end block now")
 
         """
         numtracks = None
@@ -102,32 +104,19 @@ class MMD0(object):
                 assert numtracks == block.numtracks, \
                     "blocks have differing numbers of tracks"
 
-        track = []
-        i = 0
-        while i < numtracks:
-            track.append([])
-            i += 1
-
+        b = MMD0Block(None, 0)
+        b.clear(numtracks, 0)
         for block_no in self.song.playseq[:self.song.songlen]:
             block = self.blockarr[block_no]
             i = 0
             while i < numtracks:
-                track[i].extend(block.track[i])
+                b.track[i].extend(block.track[i])
                 i += 1
 
-        line_no = 0
-        lines = len(track[0])
-        while line_no < lines:
-            track_no = 0
-            print "    ",
-            while track_no < numtracks:
-                s = str(track[track_no][line_no])
-                print s.ljust(18),
-                track_no += 1
-            print
-            line_no += 1
+        b.lines = len(b.track[0])
+        b.dump(999)
 
-        return track
+        return b
 
     def dump(self):
         print "MMD0 Header"
@@ -231,19 +220,26 @@ class InstrHdr(object):
             print "  %s: %r" % (attr, getattr(self, attr))
 
 
+def lol(count):
+    l = []
+    i = 0
+    while i < count:
+        l.append([])
+        i += 1
+    return l
+
+
 class MMD0Block(object):
     def __init__(self, buffer, offset):
         self.buffer = buffer
+        if buffer is None:
+            return
         self.numtracks = buffer.ubyte_at(offset)
         # lines is zero based, so # of lines == self.lines + 1
         self.raw_lines = buffer.ubyte_at(offset + 1)
         self.lines = self.raw_lines + 1
 
-        self.track = []
-        i = 0
-        while i < self.numtracks:
-            self.track.append([])
-            i += 1
+        self.track = lol(self.numtracks)
 
         offset = offset + 2
         line_no = 0
@@ -256,6 +252,15 @@ class MMD0Block(object):
                 track_no += 1
             line_no += 1
 
+    def clear(self, numtracks, lines):
+        """For constructing blocks manually.
+
+        """
+        self.buffer = None
+        self.numtracks = numtracks
+        self.lines = lines
+        self.track = lol(self.numtracks)
+    
     def dump(self, num):
         print "Block %d:" % num
         for attr in ('numtracks', 'lines'):
@@ -284,6 +289,24 @@ while i < 128:
     NOTE_NAMES.append('%s%s' % (STEP_NAMES[step], octstr))
     i += 1
 NOTE_NAMES = NOTE_NAMES[:128]
+CMD_NAMES = (
+    'ARPG',
+    'SLUP',
+    'SLDN',
+    'PORT',
+    'VIBR',
+    'SLFD',
+    'SLVB',
+    'TREM',
+    'HLDC',
+    'TMP2',
+    '????',
+    'JUMP',
+    'VOLM',
+    'VLSL',
+    'SYNJ',
+    'MISC',
+)
 
 
 class Event(object):
@@ -301,8 +324,11 @@ class Event(object):
         self.databyte = byte2
     
     def __str__(self):
-        return "[%02d/%s/%02d/%02d]" % (self.instr, NOTE_NAMES[self.note],
-                                        self.command, self.databyte)
+        c = "%s/%02d" % (CMD_NAMES[self.command], self.databyte)
+        if self.command == 0 and self.databyte == 0:
+            c = "----/--"
+        return "[%02d/%s/%s]" % (self.instr, NOTE_NAMES[self.note], c)
+                                       
 
 
 if __name__ == '__main__':
