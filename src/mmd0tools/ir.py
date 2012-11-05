@@ -60,35 +60,41 @@ class IRSong(object):
         ir_track = lol(self.numtracks)
         track_no = 0
         while track_no < self.numtracks:
-            ir_track[track_no] = self.track_to_ir_events(self.mmd0_block.track[track_no])
+            ir_track[track_no] = self.track_to_ir_events(
+                self.mmd0_block.track[track_no], track_no
+            )
             track_no += 1
         # XXX IRBlock?
         self.ir_track = ir_track
 
-    def track_to_ir_events(self, track):
+    def track_to_ir_events(self, track, track_no):
         # XXX handle rests (at beginning of track, and after
         # VOLM/00 commands.)
         # XXX handle effects
 
         ir_events = []
+        pos = 0
 
-        line_no = 0
         instr = None
         note = None
+        effects = []
         dur = 0
 
-        while line_no < len(track):
-            e = track[line_no]
+        while pos < len(track):
+            e = track[pos]
             if e.instr > 0:
                 if instr is not None:
-                    ir = IREvent(instr, note, dur, None)
+                    ir = IREvent(instr, note, pos, dur, track_no, effects)
                     ir_events.append(ir)
                 instr = e.instr
                 note = e.note
                 dur = 1
+                effects = []
             else:
                 dur += 1
-            line_no += 1
+            if e.command > 0 or e.databyte > 0:
+                effects.append((e.command, e.databyte))
+            pos += 1
 
         return ir_events
 
@@ -105,16 +111,16 @@ class IREvent(object):
     """An event in our intermediate representation.
 
     """
-    def __init__(self, instr, note, dur, effects):
+    def __init__(self, instr, note, start, dur, track, effects):
         self.instr = instr
         self.note = note
+        self.start = start
         self.dur = dur
+        self.track = track  # mmd0 track# that this came from
         self.effects = effects
 
     def __str__(self):
-        c = ""
-        if self.effects:
-            c = "/*"
-        return "[%02d/%s/%d%s]" % (
-            self.instr, NOTE_NAMES[self.note], self.dur, c
+        return "i %02d %05d %02d %s %d/%s" % (
+            self.instr, self.start, self.dur, NOTE_NAMES[self.note],
+            self.track, self.effects
         )
