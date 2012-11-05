@@ -60,40 +60,46 @@ class IRSong(object):
         ir_track = lol(self.numtracks)
         track_no = 0
         while track_no < self.numtracks:
-            ir_track[track_no] = self.track_to_ir_events(
-                self.mmd0_block.track[track_no], track_no
-            )
+            ir_track[track_no] = self.track_to_ir_events(track_no)
             track_no += 1
-        # XXX IRBlock?
         self.ir_track = ir_track
 
-    def track_to_ir_events(self, track, track_no):
-        # XXX handle rests (at beginning of track, and after
-        # VOLM/00 commands.)
-        # XXX handle effects
-
+    def track_to_ir_events(self, track_no):
+        track = self.mmd0_block.track[track_no]
         ir_events = []
         pos = 0
 
         instr = None
         note = None
         effects = []
+        start = 0
         dur = 0
+        note_is_going = True
 
         while pos < len(track):
             e = track[pos]
             if e.instr > 0:
                 if instr is not None:
-                    ir = IREvent(instr, note, pos, dur, track_no, effects)
+                    ir = IREvent(instr, note, start, dur, track_no, effects)
                     ir_events.append(ir)
                 instr = e.instr
                 note = e.note
-                dur = 1
+                dur = 0
+                start = pos
                 effects = []
-            else:
-                dur += 1
+                note_is_going = True
             if e.command > 0 or e.databyte > 0:
-                effects.append((e.command, e.databyte))
+                if e.command == 12 and e.databyte == 0:
+                    # The volume has been lowered to zero.  Assume the
+                    # note has stopped.  (This is an approximation, as
+                    # the volume may be raised again.  But we'll live with
+                    # losing those effects for now.
+                    note_is_going = False
+                else:
+                    # XXX record pos here
+                    effects.append((e.command, e.databyte))
+            if note_is_going:
+                dur += 1
             pos += 1
 
         return ir_events
