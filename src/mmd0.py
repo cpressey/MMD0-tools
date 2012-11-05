@@ -283,7 +283,18 @@ class MMD0Block(object):
         self.lines = lines
         self.track = lol(self.numtracks)
 
+    def to_ir_events(self):
+        ir_track = lol(self.numtracks)
+        track_no = 0
+        while track_no < self.numtracks:
+            ir_track[track_no] = self.track_to_ir_events(track_no)
+            track_no += 1
+        # XXX IRBlock?
+        return ir_track
+
     def track_to_ir_events(self, track_no):
+        # XXX handle rests (at beginning of track, and after
+        # VOLM/00 commands.)
         track = self.track[track_no]
 
         ir_events = []
@@ -291,7 +302,7 @@ class MMD0Block(object):
         line_no = 0
         instr = None
         note = None
-        dur = None
+        dur = 0
 
         while line_no < len(track):
             e = track[line_no]
@@ -407,9 +418,10 @@ if __name__ == '__main__':
     #m.dump()
     b = m.flatten()
 
-    ir_events = b.track_to_ir_events(2)
-    for ir in ir_events:
-        print ir
+    for track in b.to_ir_events():
+        print "IR TRACK"
+        for ir in track:
+            print ir
 
     if False:
         for byte in m.smplarr[0].data:
