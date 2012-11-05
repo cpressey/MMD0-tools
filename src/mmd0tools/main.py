@@ -1,5 +1,5 @@
 from mmd0tools.mmd0 import Buffer, MMD0
-
+from mmd0tools.ir import IRSong
 
 def load(filename):
     b = None
@@ -15,11 +15,9 @@ def dump(args):
 
 def convert(args):
     m = load(args[1])
-    b = m.flatten()
-    for track in b.to_ir_events():
-        print "IR TRACK"
-        for ir in track:
-            print ir
+    ir_song = IRSong(m)
+    ir_song.to_ir_events()
+    ir_song.dump()
 
 
 def samples(args):
