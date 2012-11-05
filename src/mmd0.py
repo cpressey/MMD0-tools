@@ -93,25 +93,39 @@ class MMD0(object):
         """Turn the event data in the blocks in the song sequence
         into one big block.
 
-        TODO: handle MISC/0 commands ("end block now")
-
         """
         numtracks = None
+        numlines = None
         for block in self.blockarr:
             if numtracks is None:
                 numtracks = block.numtracks
             else:
                 assert numtracks == block.numtracks, \
                     "blocks have differing numbers of tracks"
+            if numlines is None:
+                numlines = block.lines
+            else:
+                assert numlines == block.lines, \
+                    "blocks have differing numbers of lines"
 
         b = MMD0Block(None, 0)
         b.clear(numtracks, 0)
         for block_no in self.song.playseq[:self.song.songlen]:
             block = self.blockarr[block_no]
-            i = 0
-            while i < numtracks:
-                b.track[i].extend(block.track[i])
-                i += 1
+
+            line_no = 0
+            while line_no < numlines:
+                track_no = 0
+                end_block_now = False
+                while track_no < numtracks:
+                    e = block.track[track_no][line_no]
+                    if e.command == 15 and e.databyte == 0:
+                        end_block_now = True
+                    b.track[track_no].append(e)
+                    track_no += 1
+                if end_block_now:
+                    break
+                line_no += 1
 
         b.lines = len(b.track[0])
         b.dump(999)
