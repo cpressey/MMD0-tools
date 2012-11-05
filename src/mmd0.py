@@ -1,12 +1,18 @@
 #!/usr/bin/env python
 
+# This script was written by Chris Pressey, who hereby places it into the
+# public domain.
+
+# This script is also a mess and needs to be refactored.
+
+
 import sys
 
 
 class Buffer(object):
     def __init__(self, file):
         self.contents = file.read()
-    
+
     def ubyte_at(self, pos):
         return ord(self.contents[pos])
 
@@ -128,7 +134,7 @@ class MMD0(object):
                 line_no += 1
 
         b.lines = len(b.track[0])
-        b.dump(999)
+        #b.dump(999)
 
         return b
 
@@ -143,7 +149,7 @@ class MMD0(object):
             print "%s: %r" % (attr, getattr(self, attr))
         print
         self.song.dump()
-        
+
         print "Blocks"
         print "------"
         i = 0
@@ -164,7 +170,7 @@ class MMD0(object):
 class MMD0song(object):
     def __init__(self, buffer, offset):
         self.buffer = buffer
-        
+
         sample_offset = offset
         self.sample = []
         i = 0
@@ -261,7 +267,9 @@ class MMD0Block(object):
             track_no = 0
             while track_no < self.numtracks:
                 event = buffer.ubytes_at(offset, 3)
-                self.track[track_no].append(Event(event[0], event[1], event[2]))
+                self.track[track_no].append(
+                    MMD0Event(event[0], event[1], event[2])
+                )
                 offset += 3
                 track_no += 1
             line_no += 1
@@ -274,7 +282,32 @@ class MMD0Block(object):
         self.numtracks = numtracks
         self.lines = lines
         self.track = lol(self.numtracks)
-    
+
+    def track_to_ir_events(self, track_no):
+        track = self.track[track_no]
+
+        ir_events = []
+
+        line_no = 0
+        instr = None
+        note = None
+        dur = None
+
+        while line_no < len(track):
+            e = track[line_no]
+            if e.instr > 0:
+                if instr is not None:
+                    ir = IREvent(instr, note, dur, None)
+                    ir_events.append(ir)
+                instr = e.instr
+                note = e.note
+                dur = 1
+            else:
+                dur += 1
+            line_no += 1
+
+        return ir_events
+
     def dump(self, num):
         print "Block %d:" % num
         for attr in ('numtracks', 'lines'):
@@ -323,7 +356,10 @@ CMD_NAMES = (
 )
 
 
-class Event(object):
+class MMD0Event(object):
+    """A single event in a slot on an MMD0 track.
+
+    """
     def __init__(self, byte0, byte1, byte2):
         self.note = byte0 & 63
         x = byte0 & 128
@@ -336,13 +372,31 @@ class Event(object):
         self.instr = i
         self.command = byte1 & 15
         self.databyte = byte2
-    
+
     def __str__(self):
         c = "%s/%02d" % (CMD_NAMES[self.command], self.databyte)
         if self.command == 0 and self.databyte == 0:
             c = "----/--"
         return "[%02d/%s/%s]" % (self.instr, NOTE_NAMES[self.note], c)
-                                       
+
+
+class IREvent(object):
+    """An event in our intermediate representation.
+
+    """
+    def __init__(self, instr, note, dur, effects):
+        self.instr = instr
+        self.note = note
+        self.dur = dur
+        self.effects = effects
+
+    def __str__(self):
+        c = ""
+        if self.effects:
+            c = "/*"
+        return "[%02d/%s/%d%s]" % (
+            self.instr, NOTE_NAMES[self.note], self.dur, c
+        )
 
 
 if __name__ == '__main__':
@@ -351,7 +405,12 @@ if __name__ == '__main__':
         b = Buffer(f)
     m = MMD0(b)
     #m.dump()
-    m.flatten()
+    b = m.flatten()
+
+    ir_events = b.track_to_ir_events(2)
+    for ir in ir_events:
+        print ir
+
     if False:
         for byte in m.smplarr[0].data:
             # upsample to 16-bit for aplay's benefit
