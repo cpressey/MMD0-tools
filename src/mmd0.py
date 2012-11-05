@@ -89,6 +89,46 @@ class MMD0(object):
         for smpl_offset in self.smplarr_offsets:
             self.smplarr.append(InstrHdr(buffer, smpl_offset))
 
+    def flatten(self):
+        """Turn the event data in the blocks in the song sequence
+        into a list of lists of events, one list of events per track.
+
+        """
+        numtracks = None
+        for block in self.blockarr:
+            if numtracks is None:
+                numtracks = block.numtracks
+            else:
+                assert numtracks == block.numtracks, \
+                    "blocks have differing numbers of tracks"
+
+        track = []
+        i = 0
+        while i < numtracks:
+            track.append([])
+            i += 1
+
+        for block_no in self.song.playseq[:self.song.songlen]:
+            block = self.blockarr[block_no]
+            i = 0
+            while i < numtracks:
+                track[i].extend(block.track[i])
+                i += 1
+
+        line_no = 0
+        lines = len(track[0])
+        while line_no < lines:
+            track_no = 0
+            print "    ",
+            while track_no < numtracks:
+                s = str(track[track_no][line_no])
+                print s.ljust(18),
+                track_no += 1
+            print
+            line_no += 1
+
+        return track
+
     def dump(self):
         print "MMD0 Header"
         print "-----------"
@@ -270,7 +310,8 @@ if __name__ == '__main__':
     with open(sys.argv[1], 'r') as f:
         b = Buffer(f)
     m = MMD0(b)
-    m.dump()
+    #m.dump()
+    m.flatten()
     if False:
         for byte in m.smplarr[0].data:
             # upsample to 16-bit for aplay's benefit
