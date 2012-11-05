@@ -1,12 +1,11 @@
-#!/usr/bin/env python
+"""Object classes representing parts of an MMD0 file.
 
-# This script was written by Chris Pressey, who hereby places it into the
-# public domain.
+This module was written by Chris Pressey, who hereby places it into the
+public domain.
 
-# This script is also a mess and needs to be refactored.
+This module is also a mess and needs to be refactored.
 
-
-import sys
+"""
 
 
 class Buffer(object):
@@ -408,24 +407,3 @@ class IREvent(object):
         return "[%02d/%s/%d%s]" % (
             self.instr, NOTE_NAMES[self.note], self.dur, c
         )
-
-
-if __name__ == '__main__':
-    b = None
-    with open(sys.argv[1], 'r') as f:
-        b = Buffer(f)
-    m = MMD0(b)
-    #m.dump()
-    b = m.flatten()
-
-    for track in b.to_ir_events():
-        print "IR TRACK"
-        for ir in track:
-            print ir
-
-    if False:
-        for byte in m.smplarr[0].data:
-            # upsample to 16-bit for aplay's benefit
-            # usage: mmd0.py your.med | aplay --rate=8287 --format=S16_BE
-            sys.stdout.write(chr(byte))
-            sys.stdout.write(chr(0))
