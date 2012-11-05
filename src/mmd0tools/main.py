@@ -17,14 +17,14 @@ def convert(args):
     m = load(args[1])
 
     # dump all instruments to files
-    # upsampled to 16-bit for aplay's benefit
-    # usage: aplay instrument1.raw --rate=8287 --format=S16_BE
     i = 1
     for smplarr in m.smplarr:
         with open("instrument%d.raw" % i, 'w') as f:
             for byte in smplarr.data:
                 f.write(chr(byte))
-                f.write(chr(0))
+                # upsampled to 16-bit for aplay's benefit
+                # usage: aplay instrument1.raw --rate=8287 --format=S16_BE
+                # f.write(chr(0))
         i += 1
 
     ir_song = IRSong(m)
@@ -37,7 +37,7 @@ def convert(args):
 -odac
 </CsOptions>
 <CsInstruments>
-sr = 8287  ;  44100
+sr = 44100
 ksmps = 32
 nchnls = 1
 0dbfs = 1"""
@@ -45,10 +45,12 @@ nchnls = 1
     for smplarr in m.smplarr:
         print """
 instr %d
-                   /* kamp */  /* kpitch */  /* kloopstart */ /* kloopend */
-aSig      flooper2 1,          cpspch(p4) / cpspch(2.00),            0,               1, \
-                   0, /* kcrossfade */ \
-                   %d, /* ifn */ \
+aSig      flooper2 0.25,                         /* kamp */ \
+                   (cpspch(p4) / cpspch(1.00)) * 0.1879138321995465, /* kpitch */ \
+                   0,                            /* kloopstart */ \
+                   2,                            /* kloopend */ \
+                   0,                            /* kcrossfade */ \
+                   %d,                           /* ifn */ \
                    0, 0, 0, 0
           out      aSig
 
@@ -60,12 +62,13 @@ endin
 """
     i = 1
     for smplarr in m.smplarr:
-        print """f %d 0 0 1 "instrument%d.raw" 0 0 0""" % (i, i)
+        print """f %d 0 0 1 "instrument%d.raw" 0 1 0""" % (i, i)
         i += 1
+    tempo = 0.12
     for track in ir_song.ir_track:
         for e in track:
             print "i %d %.2f %.2f %.2f" % (e.instr,
-              e.start * 0.10, (e.dur) * 0.10, e.pitch)
+              e.start * tempo, (e.dur) * tempo, e.pitch)
     print """
 </CsScore>
 </CsoundSynthesizer>
