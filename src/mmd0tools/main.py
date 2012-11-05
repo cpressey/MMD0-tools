@@ -15,6 +15,18 @@ def dump(args):
 
 def convert(args):
     m = load(args[1])
+
+    # dump all instruments to files
+    # upsampled to 16-bit for aplay's benefit
+    # usage: aplay instrument1.raw --rate=8287 --format=S16_BE
+    i = 1
+    for smplarr in m.smplarr:
+        with open("instrument%d.raw" % i, 'w') as f:
+            for byte in smplarr.data:
+                f.write(chr(byte))
+                f.write(chr(0))
+        i += 1
+
     ir_song = IRSong(m)
     ir_song.to_ir_events()
     #ir_song.dump()
@@ -25,36 +37,36 @@ def convert(args):
 -odac
 </CsOptions>
 <CsInstruments>
-sr = 44100
+sr = 8287  ;  44100
 ksmps = 32
 nchnls = 1
-0dbfs = 1
-
-instr 1
-iFreq     = cpspch(p4)
-
-aEnv      line     1, p3, 0
-aSig      oscils   0dbfs/4, iFreq, 0
-          out      aSig * aEnv
+0dbfs = 1"""
+    i = 1
+    for smplarr in m.smplarr:
+        print """
+instr %d
+                   /* kamp */  /* kpitch */  /* kloopstart */ /* kloopend */
+aSig      flooper2 1,          cpspch(p4) / cpspch(2.00),            0,               1, \
+                   0, /* kcrossfade */ \
+                   %d, /* ifn */ \
+                   0, 0, 0, 0
+          out      aSig
 
 endin
-
-</CsInstruments>
+""" % (i, i)
+        i += 1
+    print """</CsInstruments>
 <CsScore>
 """
-    for e in ir_song.ir_track[2]:
-        if e.instr == 1:
+    i = 1
+    for smplarr in m.smplarr:
+        print """f %d 0 0 1 "instrument%d.raw" 0 0 0""" % (i, i)
+        i += 1
+    for track in ir_song.ir_track:
+        for e in track:
             print "i %d %.2f %.2f %.2f" % (e.instr,
-              (e.start - 96) * 0.10, (e.dur) * 0.10, e.pitch)
+              e.start * 0.10, (e.dur) * 0.10, e.pitch)
     print """
 </CsScore>
 </CsoundSynthesizer>
 """
-
-def samples(args):
-    m = load(args[1])
-    for byte in m.smplarr[0].data:
-        # upsample to 16-bit for aplay's benefit
-        # usage: mmd0.py your.med | aplay --rate=8287 --format=S16_BE
-        sys.stdout.write(chr(byte))
-        sys.stdout.write(chr(0))
