@@ -124,3 +124,11 @@ class IREvent(object):
             self.instr, self.start, self.dur, NOTE_NAMES[self.note],
             self.track, self.effects
         )
+
+    @property
+    def pitch(self):
+        n = self.note
+        octave = n / 12 + 8  # 8-octave transpose hack
+        step = n % 12
+        val = (octave * 1.0) + (step * 0.01)
+        return val

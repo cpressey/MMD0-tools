@@ -17,7 +17,12 @@ def convert(args):
     m = load(args[1])
     ir_song = IRSong(m)
     ir_song.to_ir_events()
-    ir_song.dump()
+    #ir_song.dump()
+    
+    for e in ir_song.ir_track[2]:
+        if e.instr == 1:
+            print "i %d %.2f %.2f %.2f" % (e.instr,
+              (e.start - 98) * 0.10, (e.dur) * 0.10, e.pitch)
 
 
 def samples(args):
