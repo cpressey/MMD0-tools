@@ -190,7 +190,7 @@ class InstrHdr(object):
 
     def dump(self, num):
         print "InstrHdr %d:" % num
-        for attr in ('length', 'type', 'data'):
+        for attr in ('length', 'type'):
             print "  %s: %r" % (attr, getattr(self, attr))
 
 

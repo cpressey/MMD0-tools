@@ -43,19 +43,26 @@ nchnls = 1
 0dbfs = 1"""
     i = 1
     for smplarr in m.smplarr:
+        sample = m.song.sample[i-1]
+        # XXX going to need to be cleverer than this
+        kloopstart = sample.replen / 8287.0
+        kloopend = (sample.rep + sample.replen) / 8287.0
+        kloopstart = 0.0
+        kloopend = 2.0
+        # 0.1879138321995465 = 44100 / 8287
         print """
 instr %d
-aSig      flooper2 0.25,                         /* kamp */ \
-                   (cpspch(p4) / cpspch(1.00)) * 0.1879138321995465, /* kpitch */ \
-                   0,                            /* kloopstart */ \
-                   2,                            /* kloopend */ \
-                   0,                            /* kcrossfade */ \
-                   %d,                           /* ifn */ \
+aSig      flooper2 0.25,                         /* kamp */ \ 
+                   (cpspch(p4) / cpspch(1.00)) * 0.1879138321995465, /* kpitch */ \ 
+                   %.8f,                           /* kloopstart */ \ 
+                   %.8f,                           /* kloopend */ \ 
+                   0,                            /* kcrossfade */ \ 
+                   %d,                           /* ifn */ \ 
                    0, 0, 0, 0
           out      aSig
 
 endin
-""" % (i, i)
+""" % (i, kloopstart, kloopend, i)
         i += 1
     print """</CsInstruments>
 <CsScore>
