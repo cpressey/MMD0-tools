@@ -15,6 +15,22 @@ class IRSong(object):
         into one big block.
 
         """
+
+        # create IRInstruments
+        self.ir_instr = []
+        i = 0
+        while i < mmd0.song.numsamples:
+            smplarr = mmd0.smplarr[i]
+            sample = mmd0.song.sample[i]
+            assert smplarr.type == 0
+            assert smplarr.length == len(smplarr.data)
+            self.ir_instr.append(
+                IRInstrument(sample.rep, sample.replen,
+                             sample.svol, sample.strans,
+                             smplarr.data)
+            )
+            i += 1
+
         numtracks = None
         numlines = None
         for block in mmd0.blockarr:
@@ -138,3 +154,49 @@ class IREvent(object):
         step = n % 12
         val = (octave * 1.0) + (step * 0.01)
         return val
+
+
+class IRInstrument(object):
+    def __init__(self, rep, replen, svol, strans, data):
+        self.rep = rep
+        self.replen = replen
+        self.svol = svol
+        self.strans = strans
+        self.data = data
+
+    def write_to(self, filename):
+        with open(filename, 'w') as f:
+            for byte in self.data:
+                f.write(chr(byte))
+                # upsampled to 16-bit for aplay's benefit
+                # usage: aplay instrument1.raw --rate=8287 --format=S16_BE
+                # f.write(chr(0))
+
+    def print_csound_instr(self, instr_num):
+        # XXX going to need to be cleverer than this
+        kloopstart = self.rep / 8287.0
+        kloopend = (self.rep + self.replen) / 8287.0
+        sample_length = len(self.data) / 8287.0  # in seconds
+        # 0.1879138321995465 = 44100 / 8287
+        print """
+instr %d
+kCount    init 0
+if kCount == 0 then
+kStart    = 0.0
+kEnd      = %.8f
+kCount    = 1
+else
+kStart    = %.8f
+kEnd      = %.8f
+endif
+aSig      flooper2 0.25,                         /* kamp */ \ 
+                   (cpspch(p4) / cpspch(1.00)) * 0.1879138321995465, /* kpitch */ \ 
+                   kStart,                       /* kloopstart */ \ 
+                   kEnd,                         /* kloopend */ \ 
+                   0,                            /* kcrossfade */ \ 
+                   %d,                           /* ifn */ \ 
+                   0, 0, 0, 0
+          out      aSig
+
+endin
+""" % (instr_num, sample_length, kloopstart, kloopend, instr_num)

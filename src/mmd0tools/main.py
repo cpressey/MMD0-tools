@@ -16,20 +16,13 @@ def dump(args):
 def convert(args):
     m = load(args[1])
 
-    # dump all instruments to files
-    i = 1
-    for smplarr in m.smplarr:
-        with open("instrument%d.raw" % i, 'w') as f:
-            for byte in smplarr.data:
-                f.write(chr(byte))
-                # upsampled to 16-bit for aplay's benefit
-                # usage: aplay instrument1.raw --rate=8287 --format=S16_BE
-                # f.write(chr(0))
-        i += 1
-
     ir_song = IRSong(m)
     ir_song.to_ir_events()
     #ir_song.dump()
+
+    # dump all instruments to files
+    for (instr_num, ir_instr) in enumerate(ir_song.ir_instr):
+        ir_instr.write_to("instrument%d.raw" % (instr_num + 1))
 
     print """
 <CsoundSynthesizer>
@@ -41,36 +34,14 @@ sr = 44100
 ksmps = 32
 nchnls = 1
 0dbfs = 1"""
-    i = 1
-    for smplarr in m.smplarr:
-        sample = m.song.sample[i-1]
-        # XXX going to need to be cleverer than this
-        kloopstart = sample.replen / 8287.0
-        kloopend = (sample.rep + sample.replen) / 8287.0
-        kloopstart = 0.0
-        kloopend = 2.0
-        # 0.1879138321995465 = 44100 / 8287
-        print """
-instr %d
-aSig      flooper2 0.25,                         /* kamp */ \ 
-                   (cpspch(p4) / cpspch(1.00)) * 0.1879138321995465, /* kpitch */ \ 
-                   %.8f,                           /* kloopstart */ \ 
-                   %.8f,                           /* kloopend */ \ 
-                   0,                            /* kcrossfade */ \ 
-                   %d,                           /* ifn */ \ 
-                   0, 0, 0, 0
-          out      aSig
-
-endin
-""" % (i, kloopstart, kloopend, i)
-        i += 1
+    for (instr_num, ir_instr) in enumerate(ir_song.ir_instr):
+        ir_instr.print_csound_instr(instr_num + 1)
     print """</CsInstruments>
 <CsScore>
 """
-    i = 1
-    for smplarr in m.smplarr:
-        print """f %d 0 0 1 "instrument%d.raw" 0 1 0""" % (i, i)
-        i += 1
+    for (instr_num, ir_instr) in enumerate(ir_song.ir_instr):
+        print """f %d 0 0 1 "instrument%d.raw" 0 1 0""" % (instr_num + 1, instr_num + 1)
+
     tempo = 0.12
     for track in ir_song.ir_track:
         for e in track:
