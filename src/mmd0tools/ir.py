@@ -172,31 +172,29 @@ class IRInstrument(object):
                 # usage: aplay instrument1.raw --rate=8287 --format=S16_BE
                 # f.write(chr(0))
 
-    def print_csound_instr(self, instr_num):
-        # XXX going to need to be cleverer than this
-        kloopstart = self.rep / 8287.0
-        kloopend = (self.rep + self.replen) / 8287.0
-        sample_length = len(self.data) / 8287.0  # in seconds
-        # 0.1879138321995465 = 44100 / 8287
+    def print_csound_instr(self, instr_num):      
+        # /* 44100.0 / 8287.0 == 5.321588029443707 */
+        rep = self.rep
+        replen = self.replen
+        
+        # special case b/c I can't figure this out yet
+        if rep == 0 and replen == 2:
+            rep = len(self.data) - 2
         print """
-instr %d
-kCount    init 0
-if kCount == 0 then
-kStart    = 0.0
-kEnd      = %.8f
-kCount    = 1
-else
-kStart    = %.8f
-kEnd      = %.8f
-endif
-aSig      flooper2 0.25,                         /* kamp */ \ 
-                   (cpspch(p4) / cpspch(1.00)) * 0.1879138321995465, /* kpitch */ \ 
-                   kStart,                       /* kloopstart */ \ 
-                   kEnd,                         /* kloopend */ \ 
-                   0,                            /* kcrossfade */ \ 
+instr %d  /* %d samples @ 8287 samples/sec */
+aSig      loscil   0.25,                            /* xamp */ \ 
+                   cpspch(p4),                   /* kcps */ \
                    %d,                           /* ifn */ \ 
-                   0, 0, 0, 0
+                   cpspch(1.00) * 5.321588029443707,  /* ibas */ \ 
+                   1,                            /* imod1 */ \ 
+                   %d,                           /* ibeg1 */ \ 
+                   %d,                           /* iend1 */ \
+                   1,                            /* imod2 */ \ 
+                   0,                            /* ibeg2 */ \ 
+                   1                             /* iend2 */
           out      aSig
 
 endin
-""" % (instr_num, sample_length, kloopstart, kloopend, instr_num)
+""" % (instr_num, len(self.data), instr_num,
+       rep,
+       rep + self.replen)
